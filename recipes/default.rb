@@ -13,7 +13,7 @@ directory node[id]['install_dir'] do
 end
 
 ark 'dante' do
-  url node[id]['url'] % { version: node[id]['version'] }
+  url format(node[id]['url'], version: node[id]['version'])
   version node[id]['version']
   checksum node[id]['checksum']
   action :install
@@ -64,13 +64,13 @@ end
 
 template node[id]['config_file'] do
   source 'sockd.conf.erb'
-  variables lazy {
+  variables(lazy {
     {
       internal_interface: internal_interface,
       external_interface: external_interface,
       port: node[id]['port']
     }
-  }
+  })
   action :create
 end
 
@@ -104,11 +104,18 @@ template '/etc/pam.d/sockd' do
   action :create
 end
 
+disable_verify = false
+if ::Chef::VERSION.is_a?(String)
+  disable_verify = ::Chef::VERSION.to_f >= 14.0
+else
+  disable_verify = ::Chef::VERSION >= 14.0
+end
+
 systemd_unit 'sockd.service' do
-  content({
+  content(
     Unit: {
       Description: 'Dante Proxy Server',
-      After: 'multi-user.target',
+      After: 'multi-user.target'
     },
     Service: {
       Type: 'forking',
@@ -122,9 +129,9 @@ systemd_unit 'sockd.service' do
       WantedBy: 'multi-user.target',
       Alias: 'dante.service'
     }
-  })
-  if ::Chef::VERSION >= 14.0
+  )
+  if disable_verify
     verify false
   end
-  action [:create, :enable, :start]
+  action %i[create enable start]
 end
